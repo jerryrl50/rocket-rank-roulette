@@ -179,7 +179,7 @@
 
   function connect() {
     let ws;
-    try { ws = new WebSocket("ws://localhost:21213/"); }
+    try { ws = new WebSocket("ws://127.0.0.1:21213/"); }
     catch(e) { status.textContent = "TikFinity connection unavailable"; setTimeout(connect,3000); return; }
     ws.onopen = () => status.textContent = "TikFinity connected";
     ws.onclose = () => { status.textContent = "TikFinity disconnected — reconnecting…"; setTimeout(connect,3000); };
