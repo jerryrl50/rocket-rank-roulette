@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket League Rank Roulette V8</title>
+<style>
+  :root { --pink:#ff55c8; --cyan:#4ce7ff; --gold:#ffe16b; }
+  * { box-sizing:border-box }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; font-family:Arial,Helvetica,sans-serif; color:#fff; }
+  body { display:flex; align-items:center; justify-content:center; }
+  #wrap { width:min(1080px,97vw); opacity:0; transform:scale(.96); transition:opacity .25s,transform .25s; position:relative; }
+  #wrap.show { opacity:1; transform:scale(1); }
+  .stage { position:relative; padding:22px 24px 20px; border-radius:22px; overflow:hidden; background:radial-gradient(ellipse at 50% 45%,#202447 0%,#11162d 48%,#080d1c 100%); border:2px solid rgba(126,225,255,.55); box-shadow:0 0 0 5px rgba(8,12,28,.65),0 0 35px rgba(66,211,255,.28),inset 0 0 45px rgba(0,0,0,.55); }
+  .stage:before { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.035) 50%,transparent 80%); }
+  .heading { position:relative; z-index:2; text-align:center; font-weight:1000; font-size:clamp(20px,3vw,34px); letter-spacing:1.5px; text-shadow:0 2px 8px #000; margin-bottom:13px; }
+  #username { color:var(--gold); }
+  .subheading { color:#cbd7ef; font-size:.72em; letter-spacing:2px; margin-left:8px; }
+  #window { position:relative; z-index:1; overflow:hidden; height:clamp(105px,15vw,150px); border-radius:16px; border:1px solid rgba(255,255,255,.14); background:rgba(3,7,18,.58); box-shadow:inset 0 0 24px rgba(0,0,0,.7); }
+  #window:before,#window:after { content:""; position:absolute; z-index:3; top:0; bottom:0; width:16%; pointer-events:none; }
+  #window:before { left:0;background:linear-gradient(90deg,#080d1c,transparent); }
+  #window:after { right:0;background:linear-gradient(270deg,#080d1c,transparent); }
+  #reel { height:100%; display:flex; align-items:center; gap:12px; width:max-content; transform:translateX(0); padding:0 8px; }
+  .tile { flex:0 0 clamp(120px,15vw,168px); height:clamp(76px,11vw,112px); border:1px solid rgba(255,255,255,.2); border-radius:13px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:7px; background:linear-gradient(145deg,#263453,#10182c); box-shadow:inset 0 0 16px rgba(255,255,255,.06),0 5px 15px rgba(0,0,0,.25); font-weight:1000; text-transform:uppercase; font-size:clamp(12px,1.6vw,17px); text-shadow:0 2px 3px #000; }
+  .tile .emblem { width:clamp(43px,5vw,58px); height:clamp(43px,5vw,58px); display:block; filter:drop-shadow(0 0 8px currentColor); }
+  .tile .emblem img { width:100%; height:100%; object-fit:contain; display:block; }
+  .tile .rank-name { white-space:nowrap; font-size:clamp(11px,1.35vw,15px); letter-spacing:.2px; }
+  .bronze{color:#e5a06a}.silver{color:#d9e5f5}.gold{color:#ffe16b}.platinum{color:#65f4df}.diamond{color:#55c4ff}.champion{color:#d58aff}.gc{color:#ff668e}.ssl{color:#fff}
+  .pointer { position:absolute; z-index:4; left:50%; top:0; bottom:0; width:3px; background:var(--gold); box-shadow:0 0 13px var(--gold); transform:translateX(-50%); }
+  .pointer:before,.pointer:after { content:""; position:absolute; left:50%; transform:translateX(-50%); border-left:10px solid transparent;border-right:10px solid transparent; }
+  .pointer:before { top:0;border-top:14px solid var(--gold); }
+  .pointer:after { bottom:0;border-bottom:14px solid var(--gold); }
+  #statusline { position:relative; z-index:2; text-align:center; margin-top:14px; min-height:1.4em; color:#dceaff; font-size:clamp(17px,2.2vw,25px); font-weight:900; text-shadow:0 2px 6px #000; }
+  #result { color:var(--gold); }
+  #confetti { position:absolute; inset:0; z-index:5; pointer-events:none; overflow:hidden; }
+  .conf { position:absolute; top:-20px; width:7px; height:12px; opacity:0; animation:fall 2.2s ease-out forwards; border-radius:2px; }
+  @keyframes fall { 0%{opacity:0;transform:translateY(-10px) rotate(0)} 12%{opacity:1} 100%{opacity:0;transform:translateY(420px) rotate(650deg)} }
+  #test { position:fixed; bottom:8px; left:10px; border:1px solid #ffffff55; background:#101a32dd; color:white; padding:6px 10px; border-radius:8px; font-size:11px; cursor:pointer; }
+  #connection { position:fixed; bottom:8px; right:10px; color:rgba(255,255,255,.45); font:11px Arial; }
+  @media (max-width:600px) { .stage{padding:15px 12px}.tile{flex-basis:108px}.heading{margin-bottom:9px} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="stage">
+    <div id="confetti"></div>
+    <div class="heading"><span id="username">NEW FOLLOWER</span><span class="subheading">RANK ROULETTE</span></div>
+    <div id="window">
+      <div class="pointer"></div>
+      <div id="reel"></div>
+    </div>
+    <div id="statusline">SPINNING… <span id="result">GOOD LUCK!</span></div>
+  </div>
+</div>
+<button id="test" type="button">TEST SPIN</button>
+<div id="connection">Connecting to TikFinity…</div>
+<script>
+(() => {
+  const ranks = [
+    {name:"Bronze 1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-1.png", cls:"bronze", level:1},
+    {name:"Bronze 2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-2.png", cls:"bronze", level:2},
+    {name:"Bronze 3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-3.png", cls:"bronze", level:3},
+    {name:"Silver 1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-4.png", cls:"silver", level:1},
+    {name:"Silver 2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-5.png", cls:"silver", level:2},
+    {name:"Silver 3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-6.png", cls:"silver", level:3},
+    {name:"Gold 1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-7.png", cls:"gold", level:1},
+    {name:"Gold 2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-8.png", cls:"gold", level:2},
+    {name:"Gold 3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-9.png", cls:"gold", level:3},
+    {name:"Platinum 1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-10.png", cls:"platinum", level:1},
+    {name:"Platinum 2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-11.png", cls:"platinum", level:2},
+    {name:"Platinum 3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-12.png", cls:"platinum", level:3},
+    {name:"Diamond 1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-13.png", cls:"diamond", level:1},
+    {name:"Diamond 2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-14.png", cls:"diamond", level:2},
+    {name:"Diamond 3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-15.png", cls:"diamond", level:3},
+    {name:"Champion 1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-16.png", cls:"champion", level:1},
+    {name:"Champion 2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-17.png", cls:"champion", level:2},
+    {name:"Champion 3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s4-18.png", cls:"champion", level:3},
+    {name:"GC1", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s15rank19.png", cls:"gc", level:1},
+    {name:"GC2", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s15rank20.png", cls:"gc", level:2},
+    {name:"GC3", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s15rank21.png", cls:"gc", level:3},
+    {name:"SSL", icon:"https://trackercdn.com/cdn/tracker.gg/rocket-league/ranks/s15rank22.png", cls:"ssl", level:0},
+  ];
+  const wrap = document.getElementById("wrap");
+  const reel = document.getElementById("reel");
+  const win = document.getElementById("window");
+  const username = document.getElementById("username");
+  const result = document.getElementById("result");
+  const status = document.getElementById("connection");
+  const confetti = document.getElementById("confetti");
+  let busy = false, queue = [];
+
+  function tile(rank) {
+    const el = document.createElement("div");
+    el.className = "tile " + rank.cls;
+    const emblem = document.createElement("span");
+    emblem.className = "emblem";
+    const img = document.createElement("img");
+    img.alt = "";
+    img.draggable = false;
+    img.src = rank.icon;
+    // If a remote image is unavailable, hide the broken-image placeholder.
+    img.onerror = () => { img.remove(); };
+    emblem.appendChild(img);
+    const label = document.createElement("span");
+    label.className = "rank-name";
+    label.textContent = rank.name;
+    el.append(emblem, label);
+    return el;
+  }
+  function randomRank(){ return ranks[Math.floor(Math.random()*ranks.length)]; }
+  function getName(data) {
+    const candidates = [
+      data?.nickname, data?.nickName, data?.uniqueId, data?.unique_id,
+      data?.username, data?.userName, data?.user?.nickname,
+      data?.user?.uniqueId, data?.user?.unique_id, data?.user?.username
+    ];
+    return candidates.find(v => typeof v === "string" && v.trim())?.trim() || "NEW FOLLOWER";
+  }
+  function enqueue(name) {
+    queue.push(name);
+    if (!busy) runNext();
+  }
+  function runNext() {
+    if (!queue.length) { busy = false; return; }
+    busy = true;
+    const name = queue.shift();
+    const winner = randomRank();
+    const handle = name.startsWith("@") ? name : `@${name}`;
+    // Keep the winning rank completely hidden until the reel has stopped.
+    username.textContent = `${handle}'s rank is...`;
+    result.textContent = "GOOD LUCK!";
+    document.getElementById("statusline").firstChild.textContent = "SPINNING… ";
+    wrap.classList.add("show");
+
+    reel.style.transition = "none";
+    reel.style.transform = "translateX(0)";
+    reel.innerHTML = "";
+    const sequence = [];
+    // Long lead-in before the winner, plus extra ranks after it so
+    // the reel never ends in a blank space when the winner is centered.
+    for (let i=0;i<34;i++) sequence.push(randomRank());
+    const winnerIndex = sequence.length;
+    sequence.push(winner);
+    for (let i=0;i<8;i++) sequence.push(randomRank());
+    sequence.forEach(r => reel.appendChild(tile(r)));
+
+    const target = reel.children[winnerIndex];
+    const tileCenter = target.offsetLeft + target.offsetWidth/2;
+    const offset = tileCenter - win.clientWidth/2;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      reel.style.transition = "transform 6.2s cubic-bezier(.08,.72,.08,1)";
+      reel.style.transform = `translateX(${-offset}px)`;
+    }));
+    setTimeout(() => {
+      // Reveal the winner only after the 6.2s reel animation has finished.
+      username.textContent = `${handle}'s rank is ${winner.name}!`;
+      result.textContent = "YOU GOT IT!";
+      document.getElementById("statusline").firstChild.textContent = "RANK UNLOCKED! ";
+      confetti.innerHTML = "";
+      const colors = ["#ff4fcb","#42e8ff","#ffe16b","#9b70ff","#63ffb1","#ff6b75"];
+      for (let i=0;i<75;i++) {
+        const bit = document.createElement("i");
+        bit.className = "conf";
+        bit.style.left = Math.random()*100 + "%";
+        bit.style.background = colors[Math.floor(Math.random()*colors.length)];
+        bit.style.animationDelay = (Math.random()*.65) + "s";
+        confetti.appendChild(bit);
+      }
+      setTimeout(() => {
+        wrap.classList.remove("show");
+        confetti.innerHTML = "";
+        setTimeout(runNext, 350);
+      }, 3000);
+    }, 6350);
+  }
+
+  document.getElementById("test").addEventListener("click", () => enqueue("TEST VIEWER"));
+  document.addEventListener("keydown", e => { if (e.key.toLowerCase()==="t") enqueue("TEST VIEWER"); });
+
+  function connect() {
+    let ws;
+    try { ws = new WebSocket("ws://localhost:21213/"); }
+    catch(e) { status.textContent = "TikFinity connection unavailable"; setTimeout(connect,3000); return; }
+    ws.onopen = () => status.textContent = "TikFinity connected";
+    ws.onclose = () => { status.textContent = "TikFinity disconnected — reconnecting…"; setTimeout(connect,3000); };
+    ws.onerror = () => { status.textContent = "Waiting for TikFinity Desktop App…"; };
+    ws.onmessage = ev => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.event === "follow") enqueue(getName(msg.data || {}));
+      } catch(e) {}
+    };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>
